@@ -324,4 +324,7 @@ $RECYCLE.BIN/
 *.jpg
 *.png
 *.JPG
+
+
+.idea/
 # End of https://www.toptal.com/developers/gitignore/api/pycharm,opencv,windows,python
