@@ -83,14 +83,22 @@ def main():
     print(f"result will be saved on {output_base}")
     print(f"selected images : {image_names}")
     stitcher = cv2.Stitcher.create(mode=cv2.STITCHER_SCANS)
-    stitcher.setPanoConfidenceThresh(1.30)
-    status, stitched = stitcher.stitch(images)
-
-    if status == cv2.Stitcher_OK:
-        print("Stitching successful.")
-        cv2.imwrite(os.path.join(output_base, "stitched_output.jpg"), stitched)
-    else:
-        print("Stitching failed. Error code: ", status)
+    pano_conf_thresh = 0.5
+    while pano_conf_thresh < 2.0:
+        iter_start_time = time.time()
+        stitcher.setPanoConfidenceThresh(pano_conf_thresh)
+        try:
+            status, stitched = stitcher.stitch(images)
+            if status == cv2.Stitcher_OK:
+                print("Stitching successful.")
+                cv2.imwrite(os.path.join(output_base, f"pano_conf_thresh_{pano_conf_thresh}.jpg"), stitched)
+            else:
+                print(f"Stitching failed. Error code: {status}. Trying with higher confidence threshold.")
+        except cv2.error as e:
+            print(f"OpenCV Error: {e}")
+        iter_end_time = time.time()
+        print(f"Time spent for iteration - {pano_conf_thresh}: {iter_end_time - iter_start_time}")
+        pano_conf_thresh += 0.05
 
 
 if __name__ == '__main__':

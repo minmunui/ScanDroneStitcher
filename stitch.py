@@ -35,41 +35,7 @@ def main():
 
     image_paths = [os.path.join(input_path, image_name) for image_name in image_names]
 
-    coordinates = []
-    images = []
-
-    for image_path in tqdm(image_paths, desc="reading images"):
-        coordinates.append(get_gps_from_image(img_path=image_path)[:2])
-        images.append(cv2.imread(image_path))
-
-    angles = get_angles(coordinates)
-
-    rotate = determine_rotation_angles(angles)
-
-    if is_log:
-        for idx, image_name in enumerate(image_names):
-            print(f"{idx} \t {image_name}")
-        for idx, angle in enumerate(angles):
-            print(f"angle {idx} \t {angle}")
-        for idx, r in enumerate(rotate):
-            print(f"rotate {idx} \t {ROT[str(r)]}")
-
-    discard_index = []
-
-    for i in tqdm(range(len(images)), desc="refine images"):
-        if rotate[i] == ORIGINAL:
-            continue
-        elif rotate[i] == ROTATED:
-            images[i] = cv2.rotate(images[i], cv2.ROTATE_180)
-        else:
-            discard_index.append(i)
-
-    for i in list(reversed(discard_index)):
-        del images[i]
-        del image_names[i]
-        del angles[i]
-        del rotate[i]
-        del coordinates[i]
+    images = [cv2.imread(image_path) for image_path in image_paths]
 
     output_dir = make_output_name()
 
@@ -77,13 +43,9 @@ def main():
         output_dir = args.output
     output_base = os.path.join(os.getcwd(), "data", "output", output_dir)
     os.makedirs(output_base, exist_ok=True)
-    for idx, image_name in enumerate(image_names):
-        cv2.imwrite(os.path.join(os.getcwd(), "data", "output", output_dir, f"{idx}_{image_name}"), images[idx])
-
     print(f"result will be saved on {output_base}")
     print(f"selected images : {image_names}")
     stitcher = cv2.Stitcher.create(mode=cv2.STITCHER_SCANS)
-    stitcher.setPanoConfidenceThresh(1.30)
     status, stitched = stitcher.stitch(images)
 
     if status == cv2.Stitcher_OK:

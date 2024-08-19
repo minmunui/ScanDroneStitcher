@@ -83,14 +83,20 @@ def main():
     print(f"result will be saved on {output_base}")
     print(f"selected images : {image_names}")
     stitcher = cv2.Stitcher.create(mode=cv2.STITCHER_SCANS)
-    stitcher.setPanoConfidenceThresh(1.30)
-    status, stitched = stitcher.stitch(images)
-
-    if status == cv2.Stitcher_OK:
-        print("Stitching successful.")
-        cv2.imwrite(os.path.join(output_base, "stitched_output.jpg"), stitched)
-    else:
-        print("Stitching failed. Error code: ", status)
+    stitcher.setPanoConfidenceThresh(1.15)
+    registration_resol = 0.3
+    while registration_resol < 1.0:
+        iter_start_time = time.time()
+        stitcher.setRegistrationResol(registration_resol)
+        status, stitched = stitcher.stitch(images)
+        if status == cv2.Stitcher_OK:
+            print("Stitching successful.")
+            cv2.imwrite(os.path.join(output_base, f"registration_resol_{registration_resol}.jpg"), stitched)
+        else:
+            print(f"Stitching failed. Error code: {status}. Trying with higher confidence threshold.")
+        iter_end_time = time.time()
+        print(f"Time spent for iteration - {registration_resol}: {iter_end_time - iter_start_time}")
+        registration_resol += 0.05
 
 
 if __name__ == '__main__':
