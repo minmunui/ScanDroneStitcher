@@ -24,6 +24,8 @@ def main():
     parser.add_argument('-i', '--input', type=str, help='input directory name', nargs='?', default="input")
     parser.add_argument('-o', '--output', type=str, help='output file name', nargs='?', default="result")
     parser.add_argument('-l', '--log', type=str, help='is remain log at console', nargs='?', default="log")
+    parser.add_argument('-c', '--resize', type=int, help='resize images', nargs='?', default=1)
+    parser.add_argument('-p', '--pano_conf', type=float, help='panorama confidence', nargs='?', default=1.0)
     args = parser.parse_args()
 
     input_dir = args.input  # 입력 디렉토리 이름
@@ -46,11 +48,18 @@ def main():
     print(f"result will be saved on {output_base}")
     print(f"selected images : {image_names}")
     stitcher = cv2.Stitcher.create(mode=cv2.STITCHER_SCANS)
-    status, stitched = stitcher.stitch(images)
+    stitcher.setPanoConfidenceThresh(args.pano_conf)
+
+    print(f"resize images : {args.resize}")
+    if args.resize != 1:
+        for i in range(len(images)):
+            images[i] = cv2.resize(images[i], (images[i].shape[1] // args.resize, images[i].shape[0] // args.resize))
+
+    status, stitched = stitcher.stitch(images, masks=None)
 
     if status == cv2.Stitcher_OK:
         print("Stitching successful.")
-        cv2.imwrite(os.path.join(output_base, "stitched_output.jpg"), stitched)
+        cv2.imwrite(os.path.join(output_base, f"{args.output}.tiff"), stitched)
     else:
         print("Stitching failed. Error code: ", status)
 
