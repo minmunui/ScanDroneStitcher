@@ -38,11 +38,9 @@ def main():
     image_paths = [os.path.join(input_path, image_name) for image_name in image_names]
 
     coordinates = []
-    images = []
 
     for image_path in tqdm(image_paths, desc="reading images"):
         coordinates.append(get_gps_from_image(img_path=image_path)[:2])
-        images.append(cv2.imread(image_path))
 
     angles = get_angles(coordinates)
 
@@ -58,20 +56,24 @@ def main():
 
     discard_index = []
 
-    for i in tqdm(range(len(images)), desc="refine images"):
-        if rotate[i] == ORIGINAL:
-            continue
-        elif rotate[i] == ROTATED:
-            images[i] = cv2.rotate(images[i], cv2.ROTATE_180)
-        else:
+    for i in range(len(rotate)):
+        if rotate[i] == DISCARDED:
             discard_index.append(i)
 
     for i in list(reversed(discard_index)):
-        del images[i]
         del image_names[i]
         del angles[i]
         del rotate[i]
         del coordinates[i]
+        del image_paths[i]
+
+    images = []
+
+    for i in tqdm(range(len(image_paths)), desc="read images"):
+        image = cv2.imread(image_paths[i])
+        if rotate[i] == ROTATED:
+            image = cv2.rotate(image, cv2.ROTATE_180)
+        images.append(image)
 
     output_dir = make_output_name()
 
@@ -79,6 +81,9 @@ def main():
         output_dir = args.output
     output_base = os.path.join(os.getcwd(), "data", "output", output_dir)
     os.makedirs(output_base, exist_ok=True)
+
+    print(f"len(images) : {len(images)}")
+    print(f"len(image_names) : {len(image_names)}")
     for idx, image_name in enumerate(image_names):
         cv2.imwrite(os.path.join(os.getcwd(), "data", "output", output_dir, f"{idx}_{image_name}"), images[idx])
 
