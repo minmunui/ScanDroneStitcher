@@ -23,13 +23,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input', type=str, help='input directory name', nargs='?', default="input")
     parser.add_argument('-o', '--output', type=str, help='output file name', nargs='?', default="result")
-    parser.add_argument('-l', '--log', type=str, help='is remain log at console', nargs='?', default="log")
     args = parser.parse_args()
 
     input_dir = args.input  # 입력 디렉토리 이름
-    is_log = False
-    if args.log == "log":
-        is_log = True
+
     input_path = os.path.join(os.getcwd(), "data", "input", input_dir)
     image_names = os.listdir(input_path)
 
@@ -45,14 +42,6 @@ def main():
     angles = get_angles(coordinates)
 
     rotate = determine_rotation_angles(angles)
-
-    if is_log:
-        for idx, image_name in enumerate(image_names):
-            print(f"{idx} \t {image_name}")
-        for idx, angle in enumerate(angles):
-            print(f"angle {idx} \t {angle}")
-        for idx, r in enumerate(rotate):
-            print(f"rotate {idx} \t {ROT[str(r)]}")
 
     discard_index = []
 
@@ -83,8 +72,8 @@ def main():
     print(f"result will be saved on {output_base}")
     print(f"selected images : {image_names}")
     stitcher = cv2.Stitcher.create(mode=cv2.STITCHER_SCANS)
-    pano_conf_thresh = 0.5
-    while pano_conf_thresh < 2.0:
+    pano_conf_thresh = 0.9
+    while pano_conf_thresh < 1.5:
         iter_start_time = time.time()
         stitcher.setPanoConfidenceThresh(pano_conf_thresh)
         try:
@@ -98,7 +87,7 @@ def main():
             print(f"OpenCV Error: {e}")
         iter_end_time = time.time()
         print(f"Time spent for iteration - {pano_conf_thresh}: {iter_end_time - iter_start_time}")
-        pano_conf_thresh += 0.05
+        pano_conf_thresh = round(pano_conf_thresh + 0.05, 2)
 
 
 if __name__ == '__main__':
