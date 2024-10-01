@@ -9,6 +9,8 @@ Show how to use Stitcher API from python.
 from __future__ import print_function
 
 import argparse
+import os
+import time
 from collections import OrderedDict
 
 import cv2 as cv
@@ -29,7 +31,7 @@ BA_COST_CHOICES['no'] = cv.detail_NoBundleAdjuster
 
 FEATURES_FIND_CHOICES = OrderedDict()
 try:
-    cv.xfeatures2d_SURF.create() # check if the function can be called
+    cv.xfeatures2d_SURF.create()  # check if the function can be called
     FEATURES_FIND_CHOICES['surf'] = cv.xfeatures2d_SURF.create
 except (AttributeError, cv.error) as e:
     print("SURF not available")
@@ -119,7 +121,8 @@ parser.add_argument(
 )
 parser.add_argument(
     '--estimator', action='store', default=list(ESTIMATOR_CHOICES.keys())[0],
-    help="Type of estimator used for transformation estimation. The default is '%s'." % list(ESTIMATOR_CHOICES.keys())[0],
+    help="Type of estimator used for transformation estimation. The default is '%s'." % list(ESTIMATOR_CHOICES.keys())[
+        0],
     choices=ESTIMATOR_CHOICES.keys(),
     type=str, dest='estimator'
 )
@@ -276,7 +279,9 @@ def get_compensator(args):
 def main():
     args = parser.parse_args()
     img_names = args.img_names
-    print(img_names)
+    print("Target images:", img_names)
+    img_names = [f"{img_names[0]}\\{name}" for name in os.listdir(img_names[0])]
+    # print(img_names)
     work_megapix = args.work_megapix
     seam_megapix = args.seam_megapix
     compose_megapix = args.compose_megapix
@@ -511,12 +516,15 @@ def main():
         zoom_x = 600.0 / result.shape[1]
         dst = cv.normalize(src=result, dst=None, alpha=255., norm_type=cv.NORM_MINMAX, dtype=cv.CV_8U)
         dst = cv.resize(dst, dsize=None, fx=zoom_x, fy=zoom_x)
-        cv.imshow(result_name, dst)
-        cv.waitKey()
+        # cv.imshow(result_name, dst)
+        # cv.waitKey()
 
     print("Done")
 
 
 if __name__ == '__main__':
+    start_time = time.time()
     main()
+    print("Time: {:.2f} sec".format(time.time() - start_time))
+    print("===============================")
     cv.destroyAllWindows()
