@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 
 # 이미지 읽기
-image = cv2.imread('data/input/origin/deokgok_all/DJI_20240404115647_0001_W.JPG')
+image = cv2.imread('../data/input/origin/deokgok_240404/DJI_20240404115647_0001_W.JPG')
 
 # 이미지의 높이와 너비를 얻기
 (h, w) = image.shape[:2]
