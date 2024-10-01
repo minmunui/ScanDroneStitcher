@@ -1,12 +1,17 @@
 import math
 import os
+from typing import Tuple, List, Any
 
+import cv2
 import exifread
 import matplotlib.pyplot as plt
+from cv2 import Mat
+from numpy import ndarray, dtype
+from tqdm import tqdm
 
 DISCARD = -1
 NORMAL = 0
-REVERSED = 1
+ROTATED = 1
 
 RANGE = 5.0
 
@@ -195,7 +200,7 @@ def determine_rotation(standard: float, angle: float, threshold_range: float = R
     if standard - threshold_range <= angle <= standard + threshold_range:
         return NORMAL
     elif to_360_angle(standard - threshold_range + 180) <= angle <= to_360_angle(standard + threshold_range + 180):
-        return REVERSED
+        return ROTATED
     else:
         return DISCARD
 
@@ -211,3 +216,112 @@ def determine_rotation_angles(angles: list[float]) -> list[float]:
     for angle in angles:
         results.append(determine_rotation(standard, angle))
     return results
+
+
+def getClusteredIndices(points, n_clusters, max_iterations=100):
+    """
+    Get clustered indices from points.
+
+    :param max_iterations : int, maximum number of iterations
+    :param points: list of (x, y) points
+    :param n_clusters: int, number of clusters
+    :return: list of indices
+    """
+    import numpy as np
+
+    # points를 NumPy 배열로 변환 (이미 NumPy 배열이면 변환하지 않음)
+    points_array = np.array(points)
+
+    # 데이터의 개수
+    n_points = points_array.shape[0]
+
+    # 초기 중심점 선택 (데이터 중에서 무작위로 선택)
+    np.random.seed(42)
+    initial_centroids_indices = np.random.choice(n_points, n_clusters, replace=False)
+    centroids = points_array[initial_centroids_indices]
+    labels = np.zeros(n_points)
+
+    for iteration in range(max_iterations):
+        # 각 점에 대해 가장 가까운 중심점의 인덱스를 찾음
+        distances = np.linalg.norm(points_array[:, np.newaxis] - centroids, axis=2)
+        labels = np.argmin(distances, axis=1)
+
+        # 새로운 중심점 계산
+        new_centroids = np.array(
+            [points_array[labels == k].mean(axis=0) if np.any(labels == k) else centroids[k] for k in
+             range(n_clusters)])
+
+        # 중심점의 변화량 확인
+        if np.allclose(centroids, new_centroids):
+            break  # 수렴하면 종료
+
+        centroids = new_centroids
+
+    # 각 클러스터에 속하는 점들의 인덱스를 저장할 리스트 초기화
+    cluster_indices = [[] for _ in range(n_clusters)]
+    for idx, label in enumerate(labels):
+        cluster_indices[label].append(idx)
+
+    return cluster_indices
+
+
+def plotClusteredPoints(points, clustered_indices):
+    """
+    Plot clustered points.
+
+    :param points: list of (x, y) points
+    :param clustered_indices: list of indices
+    """
+    import matplotlib.pyplot as plt
+
+    for i in range(len(clustered_indices)):
+        cluster = points[clustered_indices[i]]
+        plt.scatter(cluster[:, 0], cluster[:, 1])
+
+    plt.show()
+
+
+def align_images(dir_path: str = None, image_paths: list[str] = None) -> tuple[
+    list[Mat | ndarray], list[str] | None, list[tuple]]:
+    """
+    Align images from directory or image paths. rotate images if needed, discard images if needed, and return and save aligned images
+    :param dir_path:
+    :param image_paths:
+    :return: aligned images, aligned image paths
+    """
+
+    if dir_path is not None:
+        image_names = os.listdir(dir_path)
+        image_paths = [os.path.join(dir_path, image_name) for image_name in image_names]
+    elif image_paths is None:
+        raise Exception("dir_path and image_paths are None")
+
+    coordinates = []
+    images = []
+
+    for image_path in tqdm(image_paths, desc="reading image coordinates"):
+        coordinates.append(get_gps_from_image(img_path=image_path)[:2])
+
+    angles = get_angles(coordinates)
+    rotate = determine_rotation_angles(angles)
+
+    discard_index = []
+
+    for i in tqdm(range(len(image_paths)), desc="refine images"):
+        if rotate[i] == NORMAL:
+            image = cv2.imread(image_paths[i])
+            images.append(image)
+        elif rotate[i] == ROTATED:
+            image = cv2.imread(image_paths[i])
+            image = cv2.rotate(image, cv2.ROTATE_180)
+            images.append(image)
+        else:
+            discard_index.append(i)
+
+    for i in list(reversed(discard_index)):
+        del image_paths[i]
+        del coordinates[i]
+        del angles[i]
+        del rotate[i]
+
+    return images, image_paths, coordinates
