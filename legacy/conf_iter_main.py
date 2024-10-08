@@ -5,7 +5,7 @@ import time
 import cv2
 from tqdm import tqdm
 
-from src.gps import get_gps_from_image, get_angles, determine_rotation_angles
+from src.metadata.gps import get_gps_from_image, get_angles, determine_rotation_angles
 from src.img_io import make_output_name
 
 DISCARDED = -1

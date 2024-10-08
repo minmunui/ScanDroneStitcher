@@ -279,7 +279,7 @@ def get_compensator(args):
 def main():
     args = parser.parse_args()
     img_names = args.img_names
-    print("Target images:", img_names)
+    # print("Target images:", img_names)
     img_names = [f"{img_names[0]}\\{name}" for name in os.listdir(img_names[0])]
     # print(img_names)
     work_megapix = args.work_megapix
