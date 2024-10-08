@@ -1,52 +1,19 @@
 import math
 import os
-from typing import Tuple, List, Any
-
 import cv2
-import exifread
 import matplotlib.pyplot as plt
 from cv2 import Mat
-from numpy import ndarray, dtype
+from numpy import ndarray
 from tqdm import tqdm
+
+from src.metadata.exif import get_geotagging
+from src.metadata.time_read import get_exif_data, sort_names_by_date_time
 
 DISCARD = -1
 NORMAL = 0
 ROTATED = 1
 
 RANGE = 5.0
-
-
-def get_exif_data(img_dir: str = None, img_name: str = None, img_path: str = None):
-    """
-    Get exif data from image, if img_path is None, img_dir and img_name must be provided
-    :param img_dir: image directory
-    :param img_name:  image name
-    :param img_path:  image path
-    :return:
-    """
-    if img_dir != None and img_name != None:
-        img_path = os.path.join(os.getcwd(), img_dir, img_name)
-    elif img_path == None:
-        raise Exception("img_path is None")
-
-    with open(img_path, 'rb') as f:
-        tags = exifread.process_file(f)
-        return tags
-
-
-def get_geotagging(exif_data):
-    """
-    Get geotagging data from exif data of image, insert exif data from get_exif_data()
-    :param exif_data: exif data from image
-    :return:
-    """
-    geotagging = {}
-    for (key, val) in exif_data.items():
-        if key.startswith('GPS'):
-            geotagging[key] = val
-    if not geotagging:
-        raise ValueError("No EXIF geotagging found")
-    return geotagging
 
 
 def get_decimal_from_dms(dms, ref):
@@ -205,20 +172,59 @@ def determine_rotation(standard: float, angle: float, threshold_range: float = R
         return DISCARD
 
 
+def to_180_angle(angle: float) -> float:
+    """
+    Convert angle from 0 to 180 degree
+    :param angle:
+    :return:
+    """
+    while not 0 <= angle <= 180:
+        if angle < 0:
+            angle += 180
+        if angle > 180:
+            angle -= 180
+    return angle
+
+
+def get_standard_angle(angles: list[float]) -> float:
+    """
+    Get standard angle from angles
+    :param angles:
+    :return:
+    """
+    scores = [0] * 180
+    for angle in angles:
+        if int(to_180_angle(angle))-1 < 0:
+            scores[179] += 1
+            scores[0] += 2
+            scores[1] += 1
+        elif int(to_180_angle(angle))+1 > 179:
+            scores[178] += 1
+            scores[179] += 2
+            scores[0] += 1
+        else:
+            scores[int(to_180_angle(angle)) - 1] += 1
+            scores[int(to_180_angle(angle))] += 2
+            scores[int(to_180_angle(angle)) + 1] += 1
+    return scores.index(max(scores))
+
+
 def determine_rotation_angles(angles: list[float]) -> list[float]:
     """
     Determine rotation of angles from standard angle. If angle is in threshold range, return NORMAL(0), REVERSED(1) if reversed, DISCARD(-1) if discarded
     :param angles:
     :return:
     """
-    standard = angles[0]
+    print(f"angles : {angles}")
+    standard = get_standard_angle(angles)
+    print(f"standard : {standard}")
     results = []
     for angle in angles:
         results.append(determine_rotation(standard, angle))
     return results
 
 
-def getClusteredIndices(points, n_clusters, max_iterations=100):
+def getClusteredIndices(points, n_clusters, max_iterations=200):
     """
     Get clustered indices from points.
 
@@ -257,28 +263,31 @@ def getClusteredIndices(points, n_clusters, max_iterations=100):
 
         centroids = new_centroids
 
-    # 각 클러스터에 속하는 점들의 인덱스를 저장할 리스트 초기화
-    cluster_indices = [[] for _ in range(n_clusters)]
-    for idx, label in enumerate(labels):
-        cluster_indices[label].append(idx)
+    # 각 클러스터에 속하는 점의 인덱스를 저장
+    cluster_indices = [np.where(labels == k)[0] for k in range(n_clusters)]
 
     return cluster_indices
 
 
-def plotClusteredPoints(points, clustered_indices):
+def plotClusteredPoints(points: list[tuple], clustered_indices: list[list[int]], output_path: str = None):
     """
     Plot clustered points.
 
+    :param output_path:
     :param points: list of (x, y) points
     :param clustered_indices: list of indices
     """
     import matplotlib.pyplot as plt
 
     for i in range(len(clustered_indices)):
-        cluster = points[clustered_indices[i]]
-        plt.scatter(cluster[:, 0], cluster[:, 1])
+        cluster_points = [points[j] for j in clustered_indices[i]]
+        cluster_points = list(zip(*cluster_points))
+        plt.scatter(cluster_points[1], cluster_points[0])
 
-    plt.show()
+    if output_path is not None:
+        plt.savefig(output_path)
+    else:
+        plt.show()
 
 
 def align_images(dir_path: str = None, image_paths: list[str] = None) -> tuple[
@@ -295,6 +304,7 @@ def align_images(dir_path: str = None, image_paths: list[str] = None) -> tuple[
         image_paths = [os.path.join(dir_path, image_name) for image_name in image_names]
     elif image_paths is None:
         raise Exception("dir_path and image_paths are None")
+    image_paths = sort_names_by_date_time(image_paths)
 
     coordinates = []
     images = []
@@ -307,6 +317,7 @@ def align_images(dir_path: str = None, image_paths: list[str] = None) -> tuple[
 
     discard_index = []
 
+    # 계산된 회전값에 따라 이미지를 회전하거나 버림
     for i in tqdm(range(len(image_paths)), desc="refine images"):
         if rotate[i] == NORMAL:
             image = cv2.imread(image_paths[i])
@@ -318,6 +329,7 @@ def align_images(dir_path: str = None, image_paths: list[str] = None) -> tuple[
         else:
             discard_index.append(i)
 
+    # 불필요한 이미지 제거
     for i in list(reversed(discard_index)):
         del image_paths[i]
         del coordinates[i]
@@ -325,3 +337,4 @@ def align_images(dir_path: str = None, image_paths: list[str] = None) -> tuple[
         del rotate[i]
 
     return images, image_paths, coordinates
+
